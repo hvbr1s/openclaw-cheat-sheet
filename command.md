@@ -80,6 +80,15 @@ openclaw dashboard --no-open
 
 **Note:** If prompted in Control UI, paste the token into settings or use the tokenized dashboard URL.
 
+### Gateway Control
+```bash
+# Stop the gateway service
+openclaw gateway stop
+
+# Restart the gateway service
+openclaw gateway restart
+```
+
 ---
 
 ## 📊 Status & Monitoring
@@ -150,6 +159,46 @@ chmod 600 ~/.openclaw/workspace/secrets/private.pem
 
 ---
 
+## 💾 Backup & Restore
+
+### Create Backup
+```bash
+# Create dated backup archive
+tar -czf ~/openclaw-backup-$(date +%Y%m%d).tar.gz ~/.openclaw/
+
+# Create backup with timestamp (for multiple backups per day)
+tar -czf ~/openclaw-backup-$(date +%Y%m%d-%H%M%S).tar.gz ~/.openclaw/
+
+# Backup with progress indicator
+tar -czf ~/openclaw-backup-$(date +%Y%m%d).tar.gz ~/.openclaw/ --verbose
+```
+
+### Restore from Backup
+```bash
+# Extract backup to home directory
+tar -xzf ~/openclaw-backup-YYYYMMDD.tar.gz -C ~/
+
+# Preview backup contents without extracting
+tar -tzf ~/openclaw-backup-YYYYMMDD.tar.gz | less
+```
+
+### Transfer Backup to Local Machine
+```bash
+# From your local machine, download backup from VM
+scp -i ~/.ssh/YOUR_SSH_KEY_NAME YOUR_USERNAME@YOUR_VM_IP:~/openclaw-backup-*.tar.gz ~/Downloads/
+
+# Or use rsync for resumable transfers
+rsync -avz -e "ssh -i ~/.ssh/YOUR_SSH_KEY_NAME" YOUR_USERNAME@YOUR_VM_IP:~/openclaw-backup-*.tar.gz ~/Downloads/
+```
+
+### Backup Best Practices
+- **Before major changes**: Always backup before updating configurations or rotating secrets
+- **Regular schedule**: Consider daily/weekly backups via cron
+- **Store off-VM**: Download backups to local machine or cloud storage
+- **Test restores**: Periodically verify backups can be restored successfully
+
+---
+
 ## 🎯 Session Management
 
 ### Session Commands
@@ -217,6 +266,9 @@ npx skills add https://github.com/solana-foundation/solana-dev-skill
 | View gateway token    | `openclaw config get gateway.auth.token`             |
 | Generate new token    | `openclaw doctor --generate-gateway-token`           |
 | Open dashboard        | `openclaw dashboard --no-open`                       |
+| Stop gateway          | `openclaw gateway stop`                              |
+| Restart gateway       | `openclaw gateway restart`                           |
 | List sessions         | `openclaw sessions list`                             |
 | Kill session          | `openclaw sessions kill <session-key>`               |
 | Edit secrets          | `nano ~/.openclaw/workspace/secrets/.env`            |
+| Create backup         | `tar -czf ~/openclaw-backup-$(date +%Y%m%d).tar.gz ~/.openclaw/` |
