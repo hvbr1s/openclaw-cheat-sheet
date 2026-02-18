@@ -245,6 +245,40 @@ Each session wakes up fresh and reads memory files to rehydrate context.
 
 ---
 
+## 🔧 Troubleshooting
+
+### npm ENOTEMPTY Error During Update
+
+**Symptom:** `npm install -g openclaw@latest` fails with:
+
+```
+npm error code ENOTEMPTY
+npm error syscall rename
+npm error path /home/YOUR_USERNAME/.npm-global/lib/node_modules/openclaw
+npm error dest /home/YOUR_USERNAME/.npm-global/lib/node_modules/.openclaw-XXXXXXXX
+npm error errno -39
+npm error ENOTEMPTY: directory not empty, rename '...openclaw' -> '...openclaw-XXXXXXXX'
+```
+
+**Cause:** npm's atomic rename during install fails because the existing `openclaw` module directory is non-empty (e.g., from a previous partial install or running process).
+
+**Fix:** Manually remove both the package directory and any leftover temp directory, then reinstall:
+
+```bash
+# Remove the existing install
+rm -rf ~/.npm-global/lib/node_modules/openclaw
+
+# Remove any leftover npm temp directories (the random suffix varies)
+rm -rf ~/.npm-global/lib/node_modules/.openclaw-*
+
+# Reinstall
+npm install -g openclaw@latest
+```
+
+**Note:** The `npm warn deprecated` messages that appear after a successful install are harmless — they refer to transitive dependencies and do not affect functionality.
+
+---
+
 ## 🛠️ Skills & Extensions
 
 ### Add Skills
