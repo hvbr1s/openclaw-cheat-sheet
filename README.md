@@ -91,6 +91,86 @@ openclaw gateway restart
 
 ---
 
+## 🌐 Tailscale Integration
+
+Expose the OpenClaw gateway securely over your Tailscale network without opening any public ports.
+
+### Step 1 — Install Tailscale on the VM
+
+```bash
+curl -fsSL https://tailscale.com/install.sh | sh
+sudo tailscale up --auth-key=YOUR_TAILSCALE_AUTH_KEY
+```
+
+### Step 2 — Enable HTTPS Certificates
+
+Go to [https://login.tailscale.com/admin/dns](https://login.tailscale.com/admin/dns) and enable **HTTPS Certificates**. This is required for `tailscale serve` to work with TLS.
+
+### Step 3 — Configure OpenClaw
+
+Edit `~/.openclaw/openclaw.json` and update the `gateway` section:
+
+```json
+{
+  "gateway": {
+    "bind": "loopback",
+    "trustedProxies": ["127.0.0.1"],
+    "auth": {
+      "mode": "token",
+      "allowTailscale": true
+    },
+    "tailscale": {
+      "mode": "serve",
+      "resetOnExit": true
+    }
+  }
+}
+```
+
+**What each setting does:**
+
+| Setting | Value | Effect |
+| --- | --- | --- |
+| `bind` | `"loopback"` | Gateway only listens on `127.0.0.1` — never exposed directly to the internet |
+| `trustedProxies` | `["127.0.0.1"]` | Trust forwarded identity headers from the Tailscale Serve proxy |
+| `auth.mode` | `"token"` | Token-based authentication |
+| `auth.allowTailscale` | `true` | Tailnet devices authenticate via identity headers — no manual token needed |
+| `tailscale.mode` | `"serve"` | OpenClaw auto-configures `tailscale serve` on startup, proxying HTTPS to the local gateway port |
+| `tailscale.resetOnExit` | `true` | Removes the serve config when OpenClaw stops |
+
+### Step 4 — Restart the Gateway
+
+```bash
+openclaw gateway restart
+
+# Verify serve is active
+tailscale serve status
+```
+
+### Step 5 — Approve Your Browser Device (Important!)
+
+When you first open the dashboard from a new device, you'll see a **"pairing required"** message. This is expected — OpenClaw treats each browser as a new operator device that needs a one-time approval.
+
+```bash
+# Find the pending device request
+openclaw devices list
+
+# Approve it by ID
+openclaw devices approve <id>
+```
+
+### Result
+
+Dashboard is now accessible from any device on your tailnet at:
+
+```
+https://YOUR_HOSTNAME.YOUR_TAILNET.ts.net/
+```
+
+Tailnet devices are trusted automatically — no token prompt after initial device approval.
+
+---
+
 ## 📊 Status & Monitoring
 
 ### Check OpenClaw Status
