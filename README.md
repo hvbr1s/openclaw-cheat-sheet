@@ -4,6 +4,24 @@ Quick reference for managing OpenClaw running on Google Cloud Platform VM.
 
 ---
 
+## Table of Contents
+
+- [VM Access & Setup](#-vm-access--setup)
+- [Directory Structure](#️-directory-structure)
+- [Authentication & Gateway](#-authentication--gateway)
+- [Status & Monitoring](#-status--monitoring)
+- [Configuration](#️-configuration)
+- [Secrets Management](#-secrets-management)
+- [Tailscale Integration](#-tailscale-integration)
+- [Telegram Group Integration](#-telegram-group-integration)
+- [Backup & Restore](#-backup--restore)
+- [Session Management](#-session-management)
+- [Troubleshooting](#-troubleshooting)
+- [Skills & Extensions](#️-skills--extensions)
+- [Quick Reference](#-quick-reference)
+
+---
+
 ## 🔐 VM Access & Setup
 
 ### SSH Connection
@@ -29,7 +47,7 @@ loginctl show-user YOUR_USERNAME -p Linger
 
 ---
 
-## 🗂️ Understanding the Architecture
+## 🗂️ Directory Structure
 
 ### Install Tree Utility
 ```bash
@@ -48,18 +66,21 @@ tree -L 2 ~/.openclaw/
 tree -a ~/.openclaw/
 ```
 
-**Key directories you'll see:**
-- `workspace/` — Your projects and secrets
-- `workspace/secrets/` — Centralized credentials (.env, private.pem)
-- `memory/` — Daily logs and session memory
-- `openclaw.json` — Main configuration file
+**Key directories:**
+
+| Directory | Purpose |
+| --- | --- |
+| `workspace/` | Your projects and secrets |
+| `workspace/secrets/` | Centralized credentials (.env, private.pem) |
+| `memory/` | Daily logs and session memory |
+| `openclaw.json` | Main configuration file |
 
 ---
 
 ## 🔑 Authentication & Gateway
 
 ### Gateway Token Management
-Gateway token provides shared auth for the Gateway + Control UI.
+The gateway token provides shared auth for the Gateway + Control UI.
 
 **Location:**
 - Config: `~/.openclaw/openclaw.json` (gateway.auth.token)
@@ -87,6 +108,82 @@ openclaw gateway stop
 
 # Restart the gateway service
 openclaw gateway restart
+```
+
+---
+
+## 📊 Status & Monitoring
+
+### Check OpenClaw Status
+
+```bash
+# Quick status check
+openclaw status
+
+# Follow logs in real-time
+openclaw logs --follow
+```
+
+### System Logs (Lingered Services)
+
+```bash
+# Follow user service logs
+journalctl --user -f
+
+# Check user session status
+loginctl show-user YOUR_USERNAME
+```
+
+---
+
+## ⚙️ Configuration
+
+### Main Config File
+
+```text
+~/.openclaw/openclaw.json
+```
+
+### Model Configuration
+
+- **Switch to KimiK 2.5**: [docs.openclaw.ai/providers/moonshot](https://docs.openclaw.ai/providers/moonshot)
+- **Set compaction default**: 0.4
+
+---
+
+## 🔒 Secrets Management
+
+### Secrets Location
+
+All credentials stored in a centralized location:
+
+```text
+~/.openclaw/workspace/secrets/
+├── .env          ← API keys & vault IDs
+└── private.pem   ← EC signing key
+```
+
+**Note:** Both `fordefi-swap/` and `jupiter-swap/` read from here. Future projects should point to `../secrets/`.
+
+### Rotate Credentials
+
+```bash
+# Edit environment variables
+nano ~/.openclaw/workspace/secrets/.env
+
+# Edit private key
+nano ~/.openclaw/workspace/secrets/private.pem
+```
+
+**No restarts needed** — scripts read fresh on each run.
+
+### Security Permissions
+
+```bash
+chmod 600 ~/.openclaw/.env
+chmod 600 ~/.openclaw/workspace/.env
+chmod 600 ~/.openclaw/workspace/secrets/.env
+chmod 600 ~/.openclaw/workspace/secrets/private.pem
 ```
 
 ---
@@ -163,7 +260,7 @@ openclaw devices approve <id>
 
 Dashboard is now accessible from any device on your tailnet at:
 
-```
+```text
 https://YOUR_HOSTNAME.YOUR_TAILNET.ts.net/
 ```
 
@@ -171,70 +268,104 @@ Tailnet devices are trusted automatically — no token prompt after initial devi
 
 ---
 
-## 📊 Status & Monitoring
+## 💬 Telegram Group Integration
 
-### Check OpenClaw Status
+Add your OpenClaw bot to a Telegram group so it can respond to @mentions from group members.
+
+### Step 1 — Configure the Group in openclaw.json
+
+Edit `~/.openclaw/openclaw.json` and add a `groups` block under `channels.telegram`:
+
+```json
+{
+  "channels": {
+    "telegram": {
+      "groups": {
+        "YOUR_GROUP_ID": {
+          "requireMention": true,
+          "groupPolicy": "allowlist"
+        }
+      }
+    }
+  }
+}
+```
+
+**What each setting does:**
+
+| Setting | Value | Effect |
+| --- | --- | --- |
+| `YOUR_GROUP_ID` | e.g. `-5286025507` | The specific Telegram group to enable |
+| `requireMention` | `true` | Bot only responds when @mentioned |
+| `groupPolicy` | `"allowlist"` | Only responds to users in the allowlist (falls back to your DM allowlist if not specified) |
+
+**Optional — allow all group members:**
+
+Change `groupPolicy` to `"open"` to respond to anyone in the group regardless of the allowlist:
+
+```json
+"YOUR_GROUP_ID": {
+  "requireMention": true,
+  "groupPolicy": "open"
+}
+```
+
+### Step 2 — Add the Bot to the Group
+
+In Telegram, add your bot (e.g. `@YourOpenClawBot`) to the group.
+
+### Step 3 — Disable Privacy Mode (Required)
+
+By default, Telegram bots can only see messages that directly @mention them. Disabling privacy mode allows the bot to read all group messages (needed even if `requireMention: true`, so it can detect the mention):
+
+1. Message `@BotFather`
+2. Run `/setprivacy`
+3. Select your bot
+4. Choose **Disable**
+5. Remove the bot from the group and re-add it for the change to take effect
+
+### Step 4 — Restart the Gateway to Apply Changes
+
 ```bash
-# Quick status check
-openclaw status
-
-# Follow logs in real-time
-openclaw logs --follow
+openclaw gateway restart
 ```
 
-### System Logs (Lingered Services)
+### Finding Your Group ID
+
+If you don't know your group's ID, forward a message from the group to `@userinfobot`, or check your OpenClaw logs after the bot receives a message in the group — the group ID will appear there.
+
+### Adding Users to the Allowlist
+
+When `groupPolicy` is set to `"allowlist"`, only users in the allowlist can interact with the bot. Each user needs their **numeric Telegram user ID** (e.g. `123456789`) — this is different from their @username.
+
+**How a user can find their numeric ID:**
+
+- Message `@userinfobot` on Telegram — it replies instantly with their numeric ID
+- Or: have them send any message to the bot in the group — their ID will appear in the OpenClaw logs
+
+**Once you have their ID**, add it to `openclaw.json` under `channels.telegram`:
+
+```json
+{
+  "channels": {
+    "telegram": {
+      "groupAllowFrom": [123456789],
+      "groups": {
+        "YOUR_GROUP_ID": {
+          "requireMention": true,
+          "groupPolicy": "allowlist",
+          "allowFrom": [123456789]
+        }
+      }
+    }
+  }
+}
+```
+
+Add the ID to both `groupAllowFrom` (global fallback) and the group's `allowFrom` list. Then restart the gateway to apply:
+
 ```bash
-# Follow user service logs
-journalctl --user -f
-
-# Check user session status
-loginctl show-user YOUR_USERNAME
-```
-
----
-
-## ⚙️ Configuration
-
-### Main Config File
-```bash
-~/.openclaw/openclaw.json
-```
-
-### Model Configuration
-- **Switch to KimiK 2.5**: [docs.openclaw.ai/providers/moonshot](https://docs.openclaw.ai/providers/moonshot)
-- **Set compaction default**: 0.4
-
----
-
-## 🔒 Secrets Management
-
-### Secrets Location
-All credentials stored in centralized location:
-```
-~/.openclaw/workspace/secrets/
-├── .env          ← API keys & vault IDs
-└── private.pem   ← EC signing key
-```
-
-**Note:** Both `fordefi-swap/` and `jupiter-swap/` read from here. Future projects should point to `../secrets/`.
-
-### Rotate Credentials
-```bash
-# Edit environment variables
-nano ~/.openclaw/workspace/secrets/.env
-
-# Edit private key
-nano ~/.openclaw/workspace/secrets/private.pem
-```
-
-**No restarts needed** — scripts read fresh on each run.
-
-### Security Permissions
-```bash
-chmod 600 ~/.openclaw/.env
-chmod 600 ~/.openclaw/workspace/.env
-chmod 600 ~/.openclaw/workspace/secrets/.env
-chmod 600 ~/.openclaw/workspace/secrets/private.pem
+openclaw gateway restart
 ```
 
 ---
@@ -290,28 +421,26 @@ openclaw sessions list
 openclaw sessions kill <session-key>
 ```
 
-### Session Best Practices
+### When to Start a New Session
 
-**When to Start a New Session:**
-
-| Scenario                      | Action                    |
-| ----------------------------- | ------------------------- |
-| New topic / task              | New session               |
-| Context getting full (>80%)   | Compact or new session    |
-| Different project / workspace | New session               |
-| Debugging something complex   | New session (clean slate) |
-| Continuing same conversation  | Stay in current           |
+| Scenario | Action |
+| --- | --- |
+| New topic / task | New session |
+| Context getting full (>80%) | Compact or new session |
+| Different project / workspace | New session |
+| Debugging something complex | New session (clean slate) |
+| Continuing same conversation | Stay in current |
 
 ### What Persists Across Sessions
 
-✅ **Persists (File-based memory):**
+**Persists (file-based memory):**
 - `MEMORY.md` — curated long-term memory
 - `memory/YYYY-MM-DD.md` — daily logs
 - `SOUL.md`, `USER.md` — identity/persona
 - `TOOLS.md`, `HEARTBEAT.md` — configuration
 - Code files, docs, secrets
 
-❌ **Doesn't Persist:**
+**Doesn't persist:**
 - Conversation history (each session is isolated)
 - Tool call history
 - Temporary context
@@ -342,8 +471,7 @@ npm error ENOTEMPTY: directory not empty, rename '...openclaw' -> '...openclaw-X
 
 **Cause:** npm's atomic rename during install fails because the existing `openclaw` module directory is non-empty (e.g., from a previous partial install or running process).
 
-**Fix:** Manually remove both the package directory and any leftover temp directory, then reinstall:
-
+**Fix:**
 ```bash
 # Remove the existing install
 rm -rf ~/.npm-global/lib/node_modules/openclaw
@@ -371,18 +499,21 @@ npx skills add https://github.com/solana-foundation/solana-dev-skill
 
 ## 📝 Quick Reference
 
-| Task                  | Command                                              |
-| --------------------- | ---------------------------------------------------- |
-| SSH to VM             | `ssh -i ~/.ssh/YOUR_KEY YOUR_USER@YOUR_VM_IP`        |
-| View directory tree   | `tree ~/.openclaw/`                                  |
-| Check status          | `openclaw status`                                    |
-| View logs             | `openclaw logs --follow`                             |
-| View gateway token    | `openclaw config get gateway.auth.token`             |
-| Generate new token    | `openclaw doctor --generate-gateway-token`           |
-| Open dashboard        | `openclaw dashboard --no-open`                       |
-| Stop gateway          | `openclaw gateway stop`                              |
-| Restart gateway       | `openclaw gateway restart`                           |
-| List sessions         | `openclaw sessions list`                             |
-| Kill session          | `openclaw sessions kill <session-key>`               |
-| Edit secrets          | `nano ~/.openclaw/workspace/secrets/.env`            |
-| Create backup         | `tar -czf ~/openclaw-backup-$(date +%Y%m%d).tar.gz ~/.openclaw/` |
+| Task | Command |
+| --- | --- |
+| SSH to VM | `ssh -i ~/.ssh/YOUR_KEY YOUR_USER@YOUR_VM_IP` |
+| View directory tree | `tree ~/.openclaw/` |
+| Check status | `openclaw status` |
+| View logs | `openclaw logs --follow` |
+| View gateway token | `openclaw config get gateway.auth.token` |
+| Generate new token | `openclaw doctor --generate-gateway-token` |
+| Open dashboard | `openclaw dashboard --no-open` |
+| Stop gateway | `openclaw gateway stop` |
+| Restart gateway | `openclaw gateway restart` |
+| Verify Tailscale serve | `tailscale serve status` |
+| List pending devices | `openclaw devices list` |
+| Approve device | `openclaw devices approve <id>` |
+| List sessions | `openclaw sessions list` |
+| Kill session | `openclaw sessions kill <session-key>` |
+| Edit secrets | `nano ~/.openclaw/workspace/secrets/.env` |
+| Create backup | `tar -czf ~/openclaw-backup-$(date +%Y%m%d).tar.gz ~/.openclaw/` |
