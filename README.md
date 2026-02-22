@@ -9,6 +9,7 @@ Quick reference for managing OpenClaw running on Google Cloud Platform VM.
 - [VM Access & Setup](#-vm-access--setup)
 - [Directory Structure](#️-directory-structure)
 - [Authentication & Gateway](#-authentication--gateway)
+- [OAuth Token Refresh (OpenAI Codex)](#-oauth-token-refresh-openai-codex)
 - [Status & Monitoring](#-status--monitoring)
 - [Configuration](#️-configuration)
 - [Secrets Management](#-secrets-management)
@@ -107,6 +108,44 @@ openclaw dashboard --no-open
 openclaw gateway stop
 
 # Restart the gateway service
+openclaw gateway restart
+```
+
+---
+
+## 🔄 OAuth Token Refresh (OpenAI Codex)
+
+Token refresh is **automatic** in normal operation. You usually don't need to do anything.
+
+### How Auto-Refresh Works
+
+When the access token expires, OpenClaw will:
+
+1. Detect that `expires` is in the past
+2. Use the stored refresh token to obtain new credentials
+3. Write the updated access token, refresh token, and expiry back to:
+
+```text
+~/.openclaw/agents/main/agent/auth-profiles.json
+```
+
+### Manual Re-Login (When Auto-Refresh Fails)
+
+If the refresh token itself is revoked or invalid, auto-refresh will fail. Re-run the OAuth flow to get fresh credentials:
+
+```bash
+openclaw models auth login --provider openai-codex
+```
+
+This replaces the stored access token, refresh token, and expiry with new values.
+
+### Verify After Re-Login
+
+```bash
+# Probe the provider to confirm the token works
+openclaw models status --probe --probe-provider openai-codex
+
+# Restart the gateway to pick up the new credentials
 openclaw gateway restart
 ```
 
